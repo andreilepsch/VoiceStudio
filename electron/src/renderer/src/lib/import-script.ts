@@ -2,7 +2,7 @@ import { getBridge } from '@/components/bridge';
 import { apiJson } from '@/lib/api/client';
 import { decodeTextBytes } from '@shared/utils/readTextFile';
 
-export const SCRIPT_ACCEPT = '.txt,.md,.markdown,.doc,.docx,.pdf,.epub';
+export const SCRIPT_ACCEPT = '.txt,.md,.markdown,.srt,.doc,.docx,.pdf,.epub';
 
 export async function importScript(file: File): Promise<string> {
   if (!file.size || file.size > 16 * 1024 * 1024) throw new Error('invalid_size');
@@ -20,7 +20,7 @@ export async function importScript(file: File): Promise<string> {
     form.append('file', file);
     text = (await apiJson<{ text: string }>('/audiobook/import', { method: 'POST', body: form }))
       .text;
-  } else if (ext === 'txt' || ext === 'md' || ext === 'markdown') {
+  } else if (ext === 'txt' || ext === 'md' || ext === 'markdown' || ext === 'srt') {
     // Same decoder Stories and Dub paste use: a BOM names the encoding,
     // valid UTF-8 stays UTF-8, anything else is Windows-1252.
     text = decodeTextBytes(new Uint8Array(await file.arrayBuffer()));

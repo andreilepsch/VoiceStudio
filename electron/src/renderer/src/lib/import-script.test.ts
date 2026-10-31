@@ -1,5 +1,5 @@
 import { expect, it } from 'vitest';
-import { importScript } from './import-script';
+import { importScript, SCRIPT_ACCEPT } from './import-script';
 
 const SAMPLE = 'Café crème — it’s late.';
 
@@ -42,5 +42,15 @@ it('imports a Windows-1252 markdown file and normalizes its newlines', async () 
   if (!encode) throw new Error('missing Windows-1252 encoder');
   await expect(importScript(fileFrom('notes.md', encode(`${SAMPLE}\r\nNext line.`)))).resolves.toBe(
     `${SAMPLE}\nNext line.`,
+  );
+});
+
+it('accepts and imports .srt subtitle files with timestamps intact', async () => {
+  expect(SCRIPT_ACCEPT.split(',')).toContain('.srt');
+  const srt = '1\r\n00:00:01,000 --> 00:00:03,000\r\nOlá mundo\r\n\r\n2\r\n00:00:04,500 --> 00:00:06,000\r\nSegundo bloco\r\n';
+  const encode = encodings['UTF-8 with BOM'];
+  if (!encode) throw new Error('missing UTF-8 with BOM encoder');
+  await expect(importScript(fileFrom('captions.srt', encode(srt)))).resolves.toBe(
+    '1\n00:00:01,000 --> 00:00:03,000\nOlá mundo\n\n2\n00:00:04,500 --> 00:00:06,000\nSegundo bloco',
   );
 });

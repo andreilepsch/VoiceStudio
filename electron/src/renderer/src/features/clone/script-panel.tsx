@@ -161,7 +161,8 @@ export function ScriptPanel({
                 setPasting(true);
                 try {
                   const imported = await importScript(file);
-                  if (textareaRef.current?.value === before) edit(imported);
+                  if (textareaRef.current?.value === before)
+                    edit(imported, file.name.toLowerCase().endsWith('.srt'));
                 } catch {
                   toast.error(t('scriptEdit.import_failed'));
                 } finally {

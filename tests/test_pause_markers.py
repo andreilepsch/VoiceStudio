@@ -11,7 +11,8 @@ from omnivoice.utils.text import (
     PAUSE_DEFAULT_MS,
     PAUSE_MAX_MS,
 )
-from api.routers.generation import _render_with_pauses
+from api.routers.generation import _render_with_pauses, _render_with_srt
+from services.srt_parser import parse_srt
 
 
 # ── parser ────────────────────────────────────────────────────────────────
@@ -105,3 +106,45 @@ def test_render_no_pause_single_span_passthrough():
     segs = [("just text", 0)]
     out = _render_with_pauses(_fake_gen(sr), segs, sr)
     assert out.shape == (1, sr)
+
+
+def test_render_with_srt_places_cues_at_exact_timestamps():
+    sr = 1000
+    srt = (
+        "1\n"
+        "00:00:01,000 --> 00:00:02,000\n"
+        "First cue\n\n"
+        "2\n"
+        "00:00:03,500 --> 00:00:04,500\n"
+        "Second cue\n"
+    )
+    segs = parse_srt(srt).segments
+    assert len(segs) == 2
+
+    def _gen_cue(_text, _dur, _idx):
+        return torch.full((1, 800), 0.25)
+
+    out = _render_with_srt(_gen_cue, segs, sr)
+    # Timeline spans to end of last cue (4.5s = 4500 samples)
+    assert out.shape == (1, 4500)
+    # Leading 1s before first cue is strictly silent
+    assert torch.all(out[:, :1000] == 0)
+    # Gap between cue 1 (ends at 2.0s) and cue 2 (starts at 3.5s) is strictly silent
+    assert torch.all(out[:, 2000:3500] == 0)
+    # Cue 1 and Cue 2 slots contain synthesized speech energy
+    assert out[:, 1000:2000].abs().sum().item() > 0
+    assert out[:, 3500:4500].abs().sum().item() > 0
+
+
+def test_render_with_srt_compresses_overflowing_cue_into_slot():
+    sr = 1000
+    segs = [{"start": 0.5, "end": 1.5, "text": "Overflow cue"}]
+
+    def _gen_cue(_text, _dur, _idx):
+        # Returns 2.0s of audio for a 1.0s slot
+        return torch.full((1, 2000), 0.25)
+
+    out = _render_with_srt(_gen_cue, segs, sr)
+    assert out.shape == (1, 1500)
+    assert torch.all(out[:, :500] == 0)
+    assert out[:, 500:1500].abs().sum().item() > 0

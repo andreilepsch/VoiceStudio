@@ -551,6 +551,155 @@ def _render_with_pauses(gen_span, segments, sample_rate):
     return torch.cat(parts, dim=-1)
 
 
+def _stretch_audio_sync(wav, target_samples: int, sample_rate: int):
+    """Time-stretch a tensor along its last dimension to ``target_samples``.
+
+    Uses ffmpeg's pitch-preserving ``atempo`` filter when available and falls
+    back to linear interpolation when ffmpeg is unavailable or fails.
+    """
+    import subprocess
+    import numpy as np
+    import torch
+    from services.ffmpeg_utils import _atempo_chain, find_ffmpeg, local_inputs_only
+
+    wl = int(wav.shape[-1])
+    if target_samples <= 0 or wl <= 0 or wl == target_samples:
+        return wav
+    ratio = wl / target_samples
+    if abs(ratio - 1.0) <= 1e-4:
+        return wav[..., :target_samples] if wl > target_samples else wav
+
+    orig_shape = wav.shape
+    orig_dtype = wav.dtype
+    orig_device = wav.device
+    mono = wav.detach().cpu().to(torch.float32)
+    while mono.ndim > 1:
+        mono = mono.mean(dim=0) if mono.shape[0] > 1 else mono[0]
+
+    ffmpeg = find_ffmpeg()
+    if ffmpeg:
+        try:
+            arr = mono.numpy().reshape(-1).astype(np.float32, copy=False)
+            cmd = local_inputs_only([
+                ffmpeg, "-hide_banner", "-loglevel", "error", "-y",
+                "-f", "f32le", "-ar", str(sample_rate), "-ac", "1", "-i", "pipe:0",
+                "-af", _atempo_chain(ratio),
+                "-f", "f32le", "-ar", str(sample_rate), "-ac", "1", "pipe:1",
+            ], tool="ffmpeg")
+            res = subprocess.run(
+                cmd,
+                input=arr.tobytes(),
+                capture_output=True,
+                timeout=30,
+                check=False,
+            )
+            if res.returncode == 0 and res.stdout:
+                out_arr = np.frombuffer(res.stdout, dtype=np.float32).copy()
+                if len(out_arr) < target_samples:
+                    out_arr = np.concatenate([
+                        out_arr,
+                        np.zeros(target_samples - len(out_arr), dtype=np.float32),
+                    ])
+                elif len(out_arr) > target_samples:
+                    out_arr = out_arr[:target_samples]
+                out = torch.from_numpy(out_arr).to(device=orig_device, dtype=orig_dtype)
+                return out.reshape(*orig_shape[:-1], target_samples)
+        except Exception as exc:
+            logger.debug("atempo stretch fallback to linear interpolation: %s", exc)
+
+    stretched = torch.nn.functional.interpolate(
+        mono.reshape(1, 1, -1),
+        size=target_samples,
+        mode="linear",
+        align_corners=False,
+    ).reshape(*orig_shape[:-1], target_samples)
+    return stretched.to(device=orig_device, dtype=orig_dtype)
+
+
+def _render_with_srt(gen_cue, segments, sample_rate, *, dropped_sink=None):
+    """Synthesize SRT ``segments`` (``[{"start", "end", "text"}, ...]``) and
+    place each cue on the timeline at its ``[start, end]`` slot.
+
+    ``gen_cue(text, duration_s, index) -> torch.Tensor`` synthesizes one cue.
+    Each cue's edge silence is trimmed so speech begins promptly at ``start``;
+    if the synthesized audio exceeds ``end - start`` it is pitch-preservingly
+    time-stretched to fit the slot so cues never overlap or drift late.
+    """
+    import torch
+    from services.chunked_tts import report_dropped_chunks, trim_edge_silence
+
+    rendered: list[tuple[int, int, object]] = []
+    texts = [(s.get("text") or "").strip() for s in segments]
+    for i, seg in enumerate(segments):
+        cue_text = texts[i]
+        start_s = max(0.0, float(seg.get("start", 0.0)))
+        end_s = max(start_s, float(seg.get("end", start_s)))
+        slot_dur = end_s - start_s
+        start_sample = max(0, int(round(start_s * sample_rate)))
+        end_sample = max(start_sample, int(round(end_s * sample_rate)))
+        slot_samples = end_sample - start_sample
+        if not cue_text or slot_samples <= 0:
+            continue
+
+        wav = gen_cue(cue_text, slot_dur, i)
+        _note_generate_progress()
+        if wav is None or getattr(wav, "shape", (0,))[-1] == 0:
+            report_dropped_chunks([i], len(segments), texts, dropped_sink)
+            continue
+
+        wav = trim_edge_silence(wav, sample_rate)
+        wl = int(wav.shape[-1])
+        if wl <= 0:
+            report_dropped_chunks([i], len(segments), texts, dropped_sink)
+            continue
+
+        if wl > slot_samples:
+            wav = _stretch_audio_sync(wav, slot_samples, sample_rate)
+            wl = int(wav.shape[-1])
+        elif wl < int(slot_samples * 0.95):
+            # Mild underrun fill (down to 0.85x, matching fit_planner) so cues
+            # that nearly fill their slot don't rush and leave dead air.
+            target = min(slot_samples, int(round(wl / 0.85)))
+            if target > wl:
+                wav = _stretch_audio_sync(wav, target, sample_rate)
+                wl = int(wav.shape[-1])
+
+        fade_samples = int(0.015 * sample_rate)
+        if wl > fade_samples * 2 and fade_samples > 0:
+            wav = wav.clone()
+            ramp_up = torch.linspace(0.0, 1.0, fade_samples, device=wav.device, dtype=wav.dtype)
+            ramp_down = torch.linspace(1.0, 0.0, fade_samples, device=wav.device, dtype=wav.dtype)
+            wav[..., :fade_samples] = wav[..., :fade_samples] * ramp_up
+            wav[..., -fade_samples:] = wav[..., -fade_samples:] * ramp_down
+
+        rendered.append((start_sample, end_sample, wav))
+
+    max_end_s = max((max(0.0, float(s.get("end", 0.0))) for s in segments), default=0.0)
+    total_samples = max(1, int(round(max_end_s * sample_rate)))
+
+    if not rendered:
+        return torch.zeros(1, total_samples, dtype=torch.float32)
+
+    ref = rendered[0][2]
+    for start_sample, end_sample, wav in rendered:
+        total_samples = max(
+            total_samples,
+            end_sample,
+            start_sample + min(int(wav.shape[-1]), max(0, end_sample - start_sample)),
+        )
+
+    shape = list(ref.shape)
+    shape[-1] = total_samples
+    timeline = torch.zeros(*shape, dtype=ref.dtype, device=ref.device)
+    for start_sample, end_sample, wav in rendered:
+        slot_samples = max(0, end_sample - start_sample)
+        clip_len = min(int(wav.shape[-1]), slot_samples, total_samples - start_sample)
+        if clip_len > 0:
+            timeline[..., start_sample : start_sample + clip_len] = wav[..., :clip_len]
+
+    return timeline
+
+
 def _sanitize_audio(audio_out):
     """Replace non-finite samples (NaN / ±inf) with silence so a model glitch
     can't produce an unreadable WAV (#629). Returns the input unchanged when it's
@@ -1161,14 +1310,27 @@ def _run_inference(
                 postprocess_output=postprocess_output, **kwargs
             )
 
+        # Timed SRT/WebVTT cues: synthesize each cue and place it on the
+        # timeline at its [start, end] slot before checking inline [pause].
+        from services.srt_parser import parse_srt
+        srt_segments = parse_srt(text).segments
+
         # Inline [pause Nms] markers (issue #276): split the text and stitch
         # silence between independently-synthesized spans. Fully opt-in — text
         # without a marker takes the unchanged single-shot path below.
         from omnivoice.utils.text import parse_pause_markers
-        segments = parse_pause_markers(text)
+        segments = [] if srt_segments else parse_pause_markers(text)
         has_pause = len(segments) > 1 or (segments and segments[0][1] > 0)
 
-        if has_pause:
+        if srt_segments:
+            def _gen_cue(cue_text, _slot_dur, cue_idx):
+                if used_seed is not None:
+                    torch.manual_seed(used_seed + cue_idx)
+                return _gen(cue_text, None)[0]
+            audio_out = _render_with_srt(
+                _gen_cue, srt_segments, sr, dropped_sink=dropped_sink,
+            )
+        elif has_pause:
             def _gen_span(span_text):
                 # Per-span duration is left to the model; an explicit overall
                 # `duration` can't be meaningfully split across spans.
@@ -1256,13 +1418,27 @@ def _run_backend_inference(
             })
         sr = backend.sample_rate
 
+        from services.srt_parser import parse_srt
+        srt_segments = parse_srt(text).segments
+
         # Inline [pause Nms] markers (issue #276) work for every engine — the
         # silence stitching is model-free.
         from omnivoice.utils.text import parse_pause_markers
-        segments = parse_pause_markers(text)
+        segments = [] if srt_segments else parse_pause_markers(text)
         has_pause = len(segments) > 1 or (segments and segments[0][1] > 0)
 
-        if has_pause:
+        if srt_segments:
+            def _gen_cue(cue_text, _slot_dur, cue_idx):
+                if used_seed is not None:
+                    torch.manual_seed(used_seed + cue_idx)
+                cue_kwargs = dict(gen_kwargs)
+                if forwards_seed and used_seed is not None:
+                    cue_kwargs["seed"] = used_seed + cue_idx
+                return trace_call("synthesis", backend.generate, cue_text, duration=None, **cue_kwargs)
+            audio_out = _render_with_srt(
+                _gen_cue, srt_segments, sr, dropped_sink=dropped_sink,
+            )
+        elif has_pause:
             first_span = True
 
             def _gen_span(span_text):
@@ -2032,31 +2208,58 @@ async def generate_speech(
     # normalized text and respellings are never re-mangled (ordering rationale
     # in services/text_normalization.py). Pref-gated (default ON), idempotent,
     # never raises; applied exactly once per request, at this choke point.
+    from services.srt_parser import format_cue_timestamp, parse_srt
     from services.text_normalization import normalize_for_tts
-    text = normalize_for_tts(text, language)
+    _srt_parsed = parse_srt(text)
+    if _srt_parsed.segments:
+        if pronounce and pronunciation_enabled():
+            from services.pronunciation import apply_pronunciation, load_entries_from_db
+            try:
+                _pron_rows = load_entries_from_db()
+            except Exception:  # noqa: BLE001 — table missing / DB locked → no-op
+                _pron_rows = []
+            def _norm_cue(cue_text: str) -> str:
+                return apply_pronunciation(normalize_for_tts(cue_text, language), _pron_rows, language)
+        else:
+            from services.pronunciation import apply_inline_overrides
+            def _norm_cue(cue_text: str) -> str:
+                return apply_inline_overrides(normalize_for_tts(cue_text, language))
 
-    # Expressive-TTS Spec 01: apply the user pronunciation dictionary + inline
-    # [[…]] one-off overrides to the text, here — AFTER `language` is fully
-    # resolved (a profile may fill it above) so per-language entries match the
-    # real render language, and BEFORE the text reaches either inference path
-    # (native VoiceStudio or a pluggable backend) and the chunk splitter. This is
-    # the single point user text → normalized text → model, so the transform
-    # covers generate for every engine. Pure text substitution → identical on
-    # mac/Win/Linux. A disabled pref or empty dictionary is a pass-through, so
-    # plain text stays byte-identical (#G5 backward-compat).
-    if pronounce and pronunciation_enabled():
-        from services.pronunciation import apply_pronunciation, load_entries_from_db
-        try:
-            _pron_rows = load_entries_from_db()
-        except Exception:  # noqa: BLE001 — table missing / DB locked → no-op
-            _pron_rows = []
-        text = apply_pronunciation(text, _pron_rows, language)
+        _rebuilt_cues = []
+        for _idx, _seg in enumerate(_srt_parsed.segments, start=1):
+            _cue_body = _norm_cue(_seg["text"]).strip()
+            if not _cue_body:
+                continue
+            _ts_start = format_cue_timestamp(float(_seg["start"]), ",")
+            _ts_end = format_cue_timestamp(float(_seg["end"]), ",")
+            _rebuilt_cues.append(f"{_idx}\n{_ts_start} --> {_ts_end}\n{_cue_body}")
+        if _rebuilt_cues:
+            text = "\n\n".join(_rebuilt_cues)
     else:
-        # Even with the dictionary off, inline [[…]] overrides are an explicit,
-        # in-text authoring choice → always honored (and never left as literal
-        # double-bracket text the model would mispronounce).
-        from services.pronunciation import apply_inline_overrides
-        text = apply_inline_overrides(text)
+        text = normalize_for_tts(text, language)
+
+        # Expressive-TTS Spec 01: apply the user pronunciation dictionary + inline
+        # [[…]] one-off overrides to the text, here — AFTER `language` is fully
+        # resolved (a profile may fill it above) so per-language entries match the
+        # real render language, and BEFORE the text reaches either inference path
+        # (native VoiceStudio or a pluggable backend) and the chunk splitter. This is
+        # the single point user text → normalized text → model, so the transform
+        # covers generate for every engine. Pure text substitution → identical on
+        # mac/Win/Linux. A disabled pref or empty dictionary is a pass-through, so
+        # plain text stays byte-identical (#G5 backward-compat).
+        if pronounce and pronunciation_enabled():
+            from services.pronunciation import apply_pronunciation, load_entries_from_db
+            try:
+                _pron_rows = load_entries_from_db()
+            except Exception:  # noqa: BLE001 — table missing / DB locked → no-op
+                _pron_rows = []
+            text = apply_pronunciation(text, _pron_rows, language)
+        else:
+            # Even with the dictionary off, inline [[…]] overrides are an explicit,
+            # in-text authoring choice → always honored (and never left as literal
+            # double-bracket text the model would mispronounce).
+            from services.pronunciation import apply_inline_overrides
+            text = apply_inline_overrides(text)
 
     start_time = time.time()
 
@@ -2080,8 +2283,9 @@ async def generate_speech(
         from omnivoice.utils.text import parse_pause_markers
         from services.chunked_tts import split_text_into_chunks
 
-        _segments = parse_pause_markers(text)
-        _has_pause = len(_segments) > 1 or (_segments and _segments[0][1] > 0)
+        _has_srt = bool(parse_srt(text).segments)
+        _segments = [] if _has_srt else parse_pause_markers(text)
+        _has_pause = _has_srt or len(_segments) > 1 or (_segments and _segments[0][1] > 0)
         _text_chunks = [] if _has_pause else split_text_into_chunks(text, max_chunk_chars)
         # #1330 — see the non-streaming path: chunks the engine rendered to
         # nothing land here so the stream can say the take is missing text
