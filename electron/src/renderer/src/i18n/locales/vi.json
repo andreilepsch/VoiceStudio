@@ -620,6 +620,8 @@
     "engine_cannot_reuse_sample": "{{engine}} không thể dùng âm thanh tham chiếu nên không thể tạo lại giọng đã lưu này từ mẫu của nó. Hãy chuyển sang công cụ hỗ trợ nhân bản giọng nói, chẳng hạn OmniVoice."
   },
   "dub": {
+    "next_step": "Bước tiếp theo",
+    "workflow_hint": "Làm theo bước được tô sáng và nhấn nút bên dưới. Chỉ chọn các tùy chọn sẽ không bắt đầu lồng tiếng.",
     "timing_label": "Căn thời gian",
     "timing_concise": "Ngắn gọn",
     "timing_stretch_video": "Kéo dài video",
@@ -1988,6 +1990,7 @@
     "license_link": "Giấy phép ứng dụng",
     "output": "ĐẦU RA",
     "nothing_selected": "Không có gì được chọn hoặc không có bản nhạc",
+    "generate_before_export": "Chưa tạo âm thanh lồng tiếng. Hãy chép lời tệp, dịch văn bản và tạo bản lồng tiếng; sau đó chọn ngôn ngữ để xuất.",
     "export_mp4": "Xuất MP4",
     "export_n_audio_one": "Xuất tệp âm thanh {{count}}",
     "export_n_audio_other": "Xuất tệp âm thanh {{count}}",

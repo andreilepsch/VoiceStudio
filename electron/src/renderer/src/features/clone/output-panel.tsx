@@ -10,11 +10,44 @@ import { formatSeconds } from './format';
 import { AudioQuality } from './audio-quality';
 import { AudioFileDetails } from './audio-file-details';
 import { SectionLabel } from './section-label';
+import { useCloneSetting } from '@/lib/store/clone-settings';
+import {
+  DeleteTakeButton,
+  TakeVoice,
+  TakesList,
+  useDeleteTake,
+  useTakeGroups,
+  type TakeMode,
+} from './takes-list';
 
-export function OutputPanel() {
+export function OutputPanel({ mode = 'clone' }: { mode?: TakeMode }) {
   const { t } = useTranslation();
   const { result, objectUrl, text } = useLatestOutput();
-  if (!result || !objectUrl) return null;
+  const editorText = useCloneSetting('text');
+  const currentText = mode === 'clone' ? editorText : undefined;
+  const takes = useTakeGroups(mode, currentText);
+  const latestDelete = useDeleteTake((id) => {
+    if (id === result?.id) clearLatestOutput();
+  });
+  const hasLatest = Boolean(result && objectUrl);
+  const hasOthers = takes.groups.some((group) =>
+    group.items.some((item) => item.id !== result?.id),
+  );
+  if (!hasLatest && !hasOthers) return null;
+  if (!result || !objectUrl) {
+    return (
+      <section
+        aria-label={t('clone.history_title')}
+        className="w-full shrink-0 border-t border-border/60 bg-muted/15 px-6 py-3"
+      >
+        <TakesList mode={mode} currentText={currentText} />
+      </section>
+    );
+  }
+  const latestId = result.id;
+  const latestGroup = latestId ? takes.byTake.get(latestId) : undefined;
+  const latestNumber = latestId ? latestGroup?.numbers.get(latestId) : undefined;
+  const latestItem = latestGroup?.items.find((item) => item.id === latestId);
 
   const stamp = new Date().toISOString().slice(0, 19).replace(/[:T]/g, '-');
 
@@ -28,12 +61,19 @@ export function OutputPanel() {
           <SectionLabel>
             <AudioLinesIcon aria-hidden="true" />
             {t('clone.output_title')}
+            {latestNumber ? (
+              <span className="font-mono text-muted-foreground tabular-nums">#{latestNumber}</span>
+            ) : null}
+            {latestItem ? <TakeVoice item={latestItem} className="ml-2" /> : null}
           </SectionLabel>
           <div className="flex items-center gap-1">
             <SaveAudioButton
               url={result.audioPath ? audioUrl(result.audioPath) : undefined}
-              suggestedName={`voicestudio-${result.id ?? stamp}.wav`}
+              suggestedName={`voicestudio-${latestNumber ? `${latestNumber}-` : ''}${result.id ?? stamp}.wav`}
             />
+            {latestId ? (
+              <DeleteTakeButton onClick={() => latestDelete.requestDelete(latestId)} />
+            ) : null}
             <Button
               variant="ghost"
               size="icon-sm"
@@ -50,9 +90,9 @@ export function OutputPanel() {
         </div>
         {result && objectUrl ? (
           <>
-            <WaveformPlayer key={objectUrl} src={objectUrl} source="output" height={36} />
+            <WaveformPlayer key={`player-${objectUrl}`} src={objectUrl} source="output" height={36} />
             <AudioFileDetails blob={result.blob} />
-            {result.audioPath && <AudioQuality key={objectUrl} audioPath={result.audioPath} />}
+            {result.audioPath && <AudioQuality key={`quality-${objectUrl}`} audioPath={result.audioPath} />}
             <div className="flex flex-wrap items-start justify-between gap-3">
               <p
                 className="line-clamp-2 min-w-40 flex-1 text-sm text-muted-foreground"
@@ -67,6 +107,7 @@ export function OutputPanel() {
                 })}
               </span>
             </div>
+            <TakesList mode={mode} excludeId={result.id} currentText={currentText} />
           </>
         ) : (
           <div className="flex min-h-24 items-center justify-center rounded-lg border border-dashed text-[length:var(--text-label)] text-muted-foreground">
@@ -74,6 +115,7 @@ export function OutputPanel() {
           </div>
         )}
       </div>
+      {latestDelete.dialog}
     </section>
   );
 }

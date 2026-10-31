@@ -620,6 +620,8 @@
     "engine_cannot_reuse_sample": "{{engine}} kan geen referentieaudio gebruiken en deze opgeslagen stem dus niet opnieuw maken uit het voorbeeld. Kies een engine die stemklonen ondersteunt, zoals OmniVoice."
   },
   "dub": {
+    "next_step": "Volgende stap",
+    "workflow_hint": "Volg de gemarkeerde stap en druk op de knop hieronder. Alleen opties kiezen start de nasynchronisatie niet.",
     "timing_label": "Timing",
     "timing_concise": "Bondig",
     "timing_stretch_video": "Video uitrekken",
@@ -1988,6 +1990,7 @@
     "license_link": "Applicatielicentie",
     "output": "UITGANG",
     "nothing_selected": "Niets geselecteerd of nummer niet beschikbaar",
+    "generate_before_export": "Er is nog geen nagesynchroniseerde audio gegenereerd. Transcribeer het bestand, vertaal de tekst en genereer de nasynchronisatie. Kies daarna een taal om te exporteren.",
     "export_mp4": "MP4 exporteren",
     "export_n_audio_one": "Exporteer {{count}} audiobestand",
     "export_n_audio_other": "Exporteer {{count}} audiobestanden",

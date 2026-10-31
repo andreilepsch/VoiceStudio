@@ -620,6 +620,8 @@
     "engine_cannot_reuse_sample": "{{engine}} kan inte använda referensljud och kan därför inte återskapa den sparade rösten från dess exempel. Byt till en motor som stöder röstkloning, till exempel OmniVoice."
   },
   "dub": {
+    "next_step": "Nästa steg",
+    "workflow_hint": "Följ det markerade steget och tryck på knappen nedan. Att bara välja alternativ startar inte dubbningen.",
     "timing_label": "Tajming",
     "timing_concise": "Kortfattat",
     "timing_stretch_video": "Förläng video",
@@ -1988,6 +1990,7 @@
     "license_link": "Programlicens",
     "output": "UTGÅNG",
     "nothing_selected": "Inget valt eller spåret är inte tillgängligt",
+    "generate_before_export": "Inget dubbat ljud har genererats ännu. Transkribera filen, översätt texten och generera dubbningen. Välj sedan ett språk att exportera.",
     "export_mp4": "Exportera MP4",
     "export_n_audio_one": "Exportera {{count}} ljudfil",
     "export_n_audio_other": "Exportera {{count}} ljudfiler",

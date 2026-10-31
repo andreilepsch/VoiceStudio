@@ -633,6 +633,8 @@
     "engine_cannot_reuse_sample": "{{engine}} 无法使用参考音频，因此不能用样本重新生成这个已保存的声音。请切换到支持声音克隆的引擎（例如 OmniVoice）。"
   },
   "dub": {
+    "next_step": "下一步",
+    "workflow_hint": "按照突出显示的步骤操作，然后点击下方按钮。仅选择选项不会开始配音。",
     "timing_label": "时间匹配",
     "timing_concise": "精简",
     "timing_stretch_video": "拉伸视频",
@@ -1988,6 +1990,7 @@
     "license_link": "应用许可",
     "output": "输出",
     "nothing_selected": "未选择内容或音轨不可用",
+    "generate_before_export": "尚未生成配音音频。请先转录文件、翻译文本并生成配音，然后选择要导出的语言。",
     "export_mp4": "导出 MP4",
     "export_n_audio_one": "导出 {{count}} 个音频文件",
     "export_n_audio_other": "导出 {{count}} 个音频文件",

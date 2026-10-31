@@ -620,6 +620,8 @@
     "engine_cannot_reuse_sample": "{{engine}} 無法使用參考音訊，因此不能用樣本重新產生這個已儲存的聲音。請切換到支援聲音複製的引擎（例如 OmniVoice）。"
   },
   "dub": {
+    "next_step": "下一步",
+    "workflow_hint": "按照醒目提示的步驟操作，然後點擊下方按鈕。僅選擇選項不會開始配音。",
     "timing_label": "時間匹配",
     "timing_concise": "精簡",
     "timing_stretch_video": "延長影片",
@@ -1988,6 +1990,7 @@
     "license_link": "應用程式授權",
     "output": "輸出",
     "nothing_selected": "未選擇任何內容或曲目不可用",
+    "generate_before_export": "尚未產生配音音訊。請先轉錄檔案、翻譯文字並產生配音，再選擇要匯出的語言。",
     "export_mp4": "匯出MP4",
     "export_n_audio_one": "匯出 {{count}} 音訊文件",
     "export_n_audio_other": "匯出 {{count}} 音訊文件",

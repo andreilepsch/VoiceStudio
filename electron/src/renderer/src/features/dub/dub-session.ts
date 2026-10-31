@@ -1923,6 +1923,17 @@ export async function removeDubSource(): Promise<boolean> {
   return resetDubSession();
 }
 
+/** Retry the prepared source without re-uploading or replacing an existing transcript. */
+export async function transcribeDub() {
+  const { jobId, segments, recovery } = dubSession.state;
+  if (!jobId || segments.length || controller || cancelling) return;
+  if (recovery) {
+    await resumeDub();
+    return;
+  }
+  await run('transcribing', (signal) => transcribeJob(jobId, signal));
+}
+
 export async function resumeDub() {
   const { recovery, taskId, jobId } = dubSession.state;
   if (!recovery || !jobId || (recovery !== 'transcribing' && !taskId)) return;

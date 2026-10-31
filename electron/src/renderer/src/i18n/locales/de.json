@@ -620,6 +620,8 @@
     "engine_cannot_reuse_sample": "{{engine}} kann kein Referenzaudio verwenden und diese gespeicherte Stimme daher nicht aus ihrem Sample neu erzeugen. Wechsle zu einer Engine mit Stimmklonen, etwa OmniVoice."
   },
   "dub": {
+    "next_step": "Nächster Schritt",
+    "workflow_hint": "Folge dem hervorgehobenen Schritt und klicke auf die Schaltfläche darunter. Die Auswahl der Optionen startet die Synchronisation noch nicht.",
     "timing_label": "Timing",
     "timing_concise": "Kurz",
     "timing_stretch_video": "Video strecken",
@@ -1988,6 +1990,7 @@
     "license_link": "Anwendungslizenz",
     "output": "AUSGANG",
     "nothing_selected": "Nichts ausgewählt oder Titel nicht verfügbar",
+    "generate_before_export": "Es wurde noch kein synchronisierter Ton erzeugt. Transkribiere die Datei, übersetze den Text und erzeuge die Synchronisation. Wähle danach eine Sprache für den Export.",
     "export_mp4": "MP4 exportieren",
     "export_n_audio_one": "Exportieren Sie die Audiodatei {{count}}",
     "export_n_audio_other": "Exportieren Sie {{count}} Audiodateien",

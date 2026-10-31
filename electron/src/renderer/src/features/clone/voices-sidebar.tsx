@@ -1,6 +1,7 @@
 import { useNavigate } from '@tanstack/react-router';
 import { AudioPreviewButton } from '@/components/audio-preview-button';
 import { ProfileAvatar } from '@/components/profile-avatar';
+import { SaveAudioButton } from '@/components/save-audio-button';
 import { setWorkspace } from '@/lib/store/workspace';
 import { openTake, reuseTake, useSelectedTake } from '@/lib/store/takes';
 import { useVirtualizer } from '@tanstack/react-virtual';
@@ -453,6 +454,13 @@ function TakeRow({ item, onStar, onReuse, onDelete }: TakeRowProps) {
       <div className="pointer-events-none absolute right-1 z-10 flex items-center gap-0.5 rounded-md bg-sidebar-accent/95 p-0.5 opacity-0 backdrop-blur-xl transition-opacity group-hover:pointer-events-auto group-hover:opacity-100 group-focus-within:pointer-events-auto group-focus-within:opacity-100">
         {item.audio_path && (
           <AudioPreviewButton src={audioUrl(item.audio_path)} source={'take-' + item.id} />
+        )}
+        {item.audio_path && (
+          <SaveAudioButton
+            iconOnly
+            url={audioUrl(item.audio_path)}
+            suggestedName={`voicestudio-${item.id}.wav`}
+          />
         )}
         <Button
           variant="ghost"

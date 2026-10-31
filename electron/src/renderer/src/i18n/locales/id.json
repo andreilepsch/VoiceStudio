@@ -620,6 +620,8 @@
     "engine_cannot_reuse_sample": "{{engine}} tidak dapat menggunakan audio referensi, sehingga tidak dapat membuat ulang suara tersimpan ini dari sampelnya. Beralihlah ke mesin yang mendukung kloning suara, seperti OmniVoice."
   },
   "dub": {
+    "next_step": "Langkah berikutnya",
+    "workflow_hint": "Ikuti langkah yang disorot dan tekan tombol di bawah. Memilih opsi saja tidak memulai sulih suara.",
     "timing_label": "Pengaturan waktu",
     "timing_concise": "Ringkas",
     "timing_stretch_video": "Perpanjang video",
@@ -1988,6 +1990,7 @@
     "license_link": "Lisensi aplikasi",
     "output": "KELUARAN",
     "nothing_selected": "Tidak ada yang dipilih atau trek tidak tersedia",
+    "generate_before_export": "Audio sulih suara belum dibuat. Transkripsikan berkas, terjemahkan teks, lalu buat sulih suara; setelah itu pilih bahasa untuk diekspor.",
     "export_mp4": "Ekspor MP4",
     "export_n_audio_one": "Ekspor file audio {{count}}",
     "export_n_audio_other": "Ekspor {{count}} file audio",

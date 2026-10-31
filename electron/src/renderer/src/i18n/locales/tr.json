@@ -620,6 +620,8 @@
     "engine_cannot_reuse_sample": "{{engine}} referans ses kullanamadığı için kayıtlı bu sesi örneğinden yeniden oluşturamaz. OmniVoice gibi ses klonlamayı destekleyen bir motora geçin."
   },
   "dub": {
+    "next_step": "Sonraki adım",
+    "workflow_hint": "Vurgulanan adımı izleyin ve aşağıdaki düğmeye basın. Yalnızca seçenekleri belirlemek dublajı başlatmaz.",
     "timing_label": "Zamanlama",
     "timing_concise": "Kısa",
     "timing_stretch_video": "Videoyu uzat",
@@ -1988,6 +1990,7 @@
     "license_link": "Uygulama lisansı",
     "output": "ÇIKTI",
     "nothing_selected": "Hiçbir şey seçilmedi veya parça mevcut değil",
+    "generate_before_export": "Henüz dublaj sesi oluşturulmadı. Dosyayı yazıya dökün, metni çevirin ve dublajı oluşturun; ardından dışa aktarılacak dili seçin.",
     "export_mp4": "MP4'ü dışa aktar",
     "export_n_audio_one": "{{count}} ses dosyasını dışa aktar",
     "export_n_audio_other": "{{count}} ses dosyalarını dışa aktar",

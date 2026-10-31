@@ -18,6 +18,8 @@ import { PasteTranslation } from './paste-translation';
 import { GlossaryPanel } from './glossary-panel';
 import { CastingBoard } from './casting-board';
 import { DubbingDemo } from './dubbing-demo';
+import { DubOptionButton } from './dub-option-button';
+import { DubWorkflowGuide, dubWorkflowStep } from './dub-workflow-guide';
 import { CheckpointBanner, type CheckpointStage } from './checkpoint-banner';
 import { ConfirmDialog } from '../clone/confirm-dialog';
 import { useDubOnsets } from './use-dub-onsets';
@@ -115,6 +117,7 @@ import {
   moveResizeDubSegment,
   redoDubEdit,
   resumeDub,
+  transcribeDub,
   discardDubRecovery,
   removeDubSource,
   dubSourceRemovable,
@@ -957,6 +960,45 @@ export function DubPage() {
       setRecoveringAsr(false);
     }
   };
+  const workflowStep = dubWorkflowStep(
+    session,
+    batchTargets.map((item) => item.code),
+  );
+  const workflowTranslationReady =
+    session.quality === 'agent'
+      ? Boolean(selectedTranslationAgent || (llmAgentReady && translationReady))
+      : translationReady;
+  const workflowNeedsLanguagePack =
+    workflowStep === 1 && session.quality !== 'agent' && missingArgosPacks.length > 0;
+  const workflowDisabled =
+    cancelling ||
+    (session.recovery
+      ? false
+      : workflowStep === 1
+        ? !code || (!workflowTranslationReady && !workflowNeedsLanguagePack)
+        : workflowStep === 2
+          ? ttsBlocker !== null || !code || session.segments.some((segment) => !segment.text.trim())
+          : false);
+  const continueWorkflow = () => {
+    if (session.recovery) {
+      void resumeDub();
+      return;
+    }
+    if (workflowStep === 0) {
+      if (session.jobId) void transcribeDub();
+      else input.current?.click();
+    } else if (workflowStep === 1) {
+      if (workflowNeedsLanguagePack) void installArgosLanguagePacks();
+      else void translateTargets();
+    } else if (workflowStep === 2) void generateTargets();
+    else {
+      const panel = document.querySelector<HTMLDetailsElement>('[data-slot="dub-export-panel"]');
+      if (panel) {
+        panel.open = true;
+        panel.scrollIntoView({ block: 'nearest', behavior: 'smooth' });
+      }
+    }
+  };
   return (
     <div className="flex h-full min-h-0 flex-col">
       <WorkspaceHeader>
@@ -1008,6 +1050,35 @@ export function DubPage() {
           variant="controls"
           className="flex flex-col gap-2"
         >
+          <DubWorkflowGuide
+            step={workflowStep}
+            busy={busy || installingArgosPacks}
+            disabled={workflowDisabled}
+            status={t(installingArgosPacks ? 'common.loading' : stage)}
+            detail={
+              workflowNeedsLanguagePack
+                ? `${t('modelMaintenance.install')} · ${provider?.display_name} · ${missingArgosPacks.map((pair) => `${pair.source_lang} → ${pair.target_lang}`).join(', ')}`
+                : workflowStep === 1 && session.quality === 'agent' && !workflowTranslationReady
+                  ? t('dub.no_local_agents')
+                  : undefined
+            }
+            actionLabel={t(
+              session.recovery
+                ? 'common.resume'
+                : workflowStep === 0
+                  ? session.jobId
+                    ? 'dub.transcribe'
+                    : 'dub.upload_transcribe'
+                  : workflowStep === 1
+                    ? workflowNeedsLanguagePack
+                      ? 'modelMaintenance.install'
+                      : 'dub.translate_all'
+                    : workflowStep === 2
+                      ? 'dub.generate_dub'
+                      : 'exportModal.export_options',
+            )}
+            onContinue={continueWorkflow}
+          />
           <section
             className={cn(
               'space-y-3 rounded-xl border border-border/60 bg-muted/15 p-3 transition-colors',
@@ -1371,24 +1442,24 @@ export function DubPage() {
                 </summary>
                 <p className="text-xs leading-5 text-muted-foreground">{t('dub.dialect_title')}</p>
                 <div className="flex flex-wrap gap-1">
-                  <Button
+                  <DubOptionButton
                     size="xs"
-                    variant={!session.dialect ? 'secondary' : 'ghost'}
+                    selected={!session.dialect}
                     disabled={busy || Boolean(session.recovery)}
                     onClick={() => setDubTranslationOptions({ dialect: undefined })}
                   >
                     {t('dub.dialect_default')}
-                  </Button>
+                  </DubOptionButton>
                   {dialectOptionsFor(code).map((dialect) => (
-                    <Button
+                    <DubOptionButton
                       key={dialect}
                       size="xs"
-                      variant={session.dialect === dialect ? 'secondary' : 'ghost'}
+                      selected={session.dialect === dialect}
                       disabled={busy || Boolean(session.recovery)}
                       onClick={() => setDubTranslationOptions({ dialect })}
                     >
                       {dialectLabel(dialect, i18n.language)}
-                    </Button>
+                    </DubOptionButton>
                   ))}
                 </div>
               </details>
@@ -1403,10 +1474,9 @@ export function DubPage() {
                 aria-label={t('about.translator')}
                 className="grid grid-cols-2 gap-1 rounded-lg bg-muted/30 p-1"
               >
-                <Button
+                <DubOptionButton
                   size="sm"
-                  variant={session.quality === 'agent' ? 'secondary' : 'ghost'}
-                  aria-pressed={session.quality === 'agent'}
+                  selected={session.quality === 'agent'}
                   disabled={
                     busy ||
                     Boolean(session.recovery) ||
@@ -1422,11 +1492,10 @@ export function DubPage() {
                 >
                   <WandSparklesIcon className="shrink-0" />
                   <span className="min-w-0 truncate">{t('dub.translate_with_agent')}</span>
-                </Button>
-                <Button
+                </DubOptionButton>
+                <DubOptionButton
                   size="sm"
-                  variant={session.quality !== 'agent' ? 'secondary' : 'ghost'}
-                  aria-pressed={session.quality !== 'agent'}
+                  selected={session.quality !== 'agent'}
                   disabled={busy || Boolean(session.recovery) || !provider}
                   className="h-auto min-w-0 justify-start px-2.5 py-2"
                   title={provider?.display_name}
@@ -1436,7 +1505,7 @@ export function DubPage() {
                   <span className="min-w-0 truncate">
                     {provider?.display_name || t('engineSidebar.translation')}
                   </span>
-                </Button>
+                </DubOptionButton>
               </div>
               {session.quality === 'agent' && (
                 <p className="px-1 text-xs leading-5 text-muted-foreground">
@@ -1482,16 +1551,15 @@ export function DubPage() {
                 </p>
                 <div className="flex flex-wrap gap-1">
                   {(['fast', 'autofit', 'cinematic'] as const).map((quality) => (
-                    <Button
+                    <DubOptionButton
                       key={quality}
                       size="sm"
-                      variant={session.quality === quality ? 'secondary' : 'ghost'}
-                      aria-pressed={session.quality === quality}
+                      selected={session.quality === quality}
                       disabled={busy || Boolean(session.recovery)}
                       onClick={() => setDubQuality(quality)}
                     >
                       {t('settings.translate_' + quality)}
-                    </Button>
+                    </DubOptionButton>
                   ))}
                 </div>
                 <div className="space-y-2 border-t border-border/50 pt-2">
@@ -1626,18 +1694,15 @@ export function DubPage() {
               <div className="flex flex-wrap gap-1">
                 {(['concise', 'smart_fit', 'stretch_video', 'strict_slot'] as const).map(
                   (value) => (
-                    <Button
+                    <DubOptionButton
                       key={value}
                       size="xs"
                       disabled={busy || Boolean(session.recovery)}
-                      aria-pressed={(session.timingStrategy || 'strict_slot') === value}
-                      variant={
-                        (session.timingStrategy || 'strict_slot') === value ? 'secondary' : 'ghost'
-                      }
+                      selected={(session.timingStrategy || 'strict_slot') === value}
                       onClick={() => setDubProduction({ timingStrategy: value })}
                     >
                       {t('dub.timing_' + (value === 'strict_slot' ? 'lip_sync' : value))}
-                    </Button>
+                    </DubOptionButton>
                   ),
                 )}
               </div>
@@ -1648,16 +1713,15 @@ export function DubPage() {
               <p className="text-xs text-muted-foreground">{t('dub.voice_match_title')}</p>
               <div className="flex flex-wrap gap-1">
                 {(['per_line', 'consistent'] as const).map((value) => (
-                  <Button
+                  <DubOptionButton
                     key={value}
                     size="xs"
                     disabled={busy || Boolean(session.recovery)}
-                    aria-pressed={(session.voiceMatch || 'per_line') === value}
-                    variant={(session.voiceMatch || 'per_line') === value ? 'secondary' : 'ghost'}
+                    selected={(session.voiceMatch || 'per_line') === value}
                     onClick={() => setDubProduction({ voiceMatch: value })}
                   >
                     {t('dub.voice_match_' + value)}
-                  </Button>
+                  </DubOptionButton>
                 ))}
               </div>
             </div>

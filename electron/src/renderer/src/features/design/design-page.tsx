@@ -510,7 +510,7 @@ export function DesignPage() {
               }
             />
           </div>
-          <OutputPanel />
+          <OutputPanel mode="design" />
           <div className="mx-auto w-full max-w-4xl shrink-0 px-6 pb-4">
             {designBlocker === 'engine' && !generation.isGenerating && (
               <div className="mb-3">

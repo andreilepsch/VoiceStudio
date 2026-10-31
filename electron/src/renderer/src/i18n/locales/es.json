@@ -622,6 +622,8 @@
     "engine_cannot_reuse_sample": "{{engine}} no puede usar audio de referencia, así que no puede volver a generar esta voz guardada a partir de su muestra. Cambia a un motor compatible con la clonación de voz, como OmniVoice."
   },
   "dub": {
+    "next_step": "Siguiente paso",
+    "workflow_hint": "Sigue el paso resaltado y pulsa el botón de abajo. Elegir las opciones no inicia el doblaje.",
     "timing_label": "Sincronización",
     "timing_concise": "Conciso",
     "timing_stretch_video": "Estirar vídeo",
@@ -1990,6 +1992,7 @@
     "license_link": "Licencia de la aplicación",
     "output": "SALIDA",
     "nothing_selected": "No hay nada seleccionado o pista no disponible",
+    "generate_before_export": "Aún no se ha generado audio doblado. Transcribe el archivo, traduce el texto y genera el doblaje; después selecciona un idioma para exportar.",
     "export_mp4": "Exportar MP4",
     "export_n_audio_one": "Exportar archivo de audio {{count}}",
     "export_n_audio_other": "Exportar {{count}} archivos de audio",

@@ -266,6 +266,18 @@ The current workflow opens automatically. Group buttons can expand or collapse
 without navigating; the compact rail opens the same destinations in a flyout.
 Transcribe, Projects, Tools, and Integrations remain directly accessible.
 
+Dubbing marks the selected dialect, translator, translation quality, timing strategy,
+and voice matching option with the theme's primary color and a check mark. These
+buttons expose their pressed state to assistive technology and retain the selection
+when navigating away and back. Unavailable options stay disabled.
+Export format, language, and bitrate choices use the same selection indicator.
+Audio export lists completed dub tracks only; before generation, the panel explains
+that transcription, translation, and dub generation must be completed first.
+The top of the Dubbing sidebar shows a four-step guide and one button for the
+next action: upload/transcribe, translate, generate, or open export options.
+Prepared files without a transcript can restart transcription directly. Each
+stage remains explicit; changing an option never starts generation automatically.
+
 ### Desktop Pro licence configuration
 
 The open-source Pro page opens the public pricing site. The open-source app

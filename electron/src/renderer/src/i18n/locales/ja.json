@@ -620,6 +620,8 @@
     "engine_cannot_reuse_sample": "{{engine}} は参照音声を使用できないため、この保存済みの音声をそのサンプルから再生成できません。OmniVoice など音声クローンに対応したエンジンに切り替えてください。"
   },
   "dub": {
+    "next_step": "次のステップ",
+    "workflow_hint": "強調表示されたステップに従い、下のボタンを押してください。設定を選ぶだけでは吹き替えは開始されません。",
     "timing_label": "タイミング",
     "timing_concise": "簡潔",
     "timing_stretch_video": "動画を引き伸ばす",
@@ -1988,6 +1990,7 @@
     "license_link": "アプリのライセンス",
     "output": "出力",
     "nothing_selected": "何も選択されていないか、トラックが利用できません",
+    "generate_before_export": "吹き替え音声はまだ生成されていません。ファイルを文字起こしし、テキストを翻訳して吹き替えを生成してから、書き出す言語を選択してください。",
     "export_mp4": "MP4 のエクスポート",
     "export_n_audio_one": "{{count}} オーディオ ファイルをエクスポート",
     "export_n_audio_other": "{{count}} オーディオ ファイルをエクスポートする",

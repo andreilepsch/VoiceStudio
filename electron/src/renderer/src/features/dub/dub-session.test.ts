@@ -6,6 +6,7 @@ import { consumeTaskStream, IncompleteTaskStreamError } from '@/lib/api/event-st
 import {
   applyDubTranslationRows,
   uploadDub,
+  transcribeDub,
   setDubProduction,
   dubSession,
   generateDub,
@@ -40,6 +41,37 @@ vi.mock('@/lib/api/event-stream', async (load) => ({
   ...(await load<typeof import('@/lib/api/event-stream')>()),
   consumeTaskStream: vi.fn(),
 }));
+
+it('starts transcription for a prepared file without uploading again or overwriting an existing transcript', async () => {
+  vi.mocked(apiJson).mockReset();
+  vi.mocked(consumeTaskStream).mockReset();
+  dubSession.setState((current) => ({
+    ...current,
+    jobId: 'prepared-guide',
+    taskId: null,
+    phase: 'editing',
+    recovery: null,
+    segments: [],
+    numSpeakers: undefined,
+  }));
+  vi.mocked(consumeTaskStream).mockImplementationOnce(async (_url, onEvent) => {
+    onEvent({
+      type: 'final',
+      source_lang: 'en',
+      segments: [{ id: 'one', start: 0, end: 1, text: 'Hello' }],
+    });
+  });
+  await transcribeDub();
+  expect(consumeTaskStream).toHaveBeenCalledWith(
+    '/dub/transcribe-stream/prepared-guide',
+    expect.any(Function),
+    expect.any(AbortSignal),
+  );
+  expect(apiJson).not.toHaveBeenCalled();
+  expect(dubSession.state.segments[0].text).toBe('Hello');
+  await transcribeDub();
+  expect(consumeTaskStream).toHaveBeenCalledOnce();
+});
 
 it('translates the current dubbing segments with an installed local CLI agent', async () => {
   let logListener: ((event: { requestId: string; text: string }) => void) | undefined;

@@ -9,6 +9,7 @@ import { apiPath, describeError, errorFromResponse } from '@/lib/api/client';
 import { saveExport } from '@/lib/export-history';
 import { dubExportRequest, type DubExportFormat } from './dub-export';
 import { setDubExportPreferences, type DubSession } from './dub-session';
+import { DubOptionButton } from './dub-option-button';
 
 export function DubExportPanel({ session, disabled }: { session: DubSession; disabled: boolean }) {
   const { t } = useTranslation();
@@ -112,7 +113,10 @@ export function DubExportPanel({ session, disabled }: { session: DubSession; dis
     </div>
   );
   return (
-    <details className="group rounded-xl border border-border/60 bg-muted/20 p-3">
+    <details
+      data-slot="dub-export-panel"
+      className="group rounded-xl border border-border/60 bg-muted/20 p-3"
+    >
       <summary className="flex cursor-pointer list-none items-center gap-2 text-sm font-medium">
         <DownloadIcon className="size-4 text-muted-foreground" />
         {t('exportModal.export_options')}
@@ -124,15 +128,14 @@ export function DubExportPanel({ session, disabled }: { session: DubSession; dis
           {(Object.keys(labels) as DubExportFormat[])
             .filter((value) => value !== 'mp4' || session.inputType === 'video')
             .map((value) => (
-              <Button
+              <DubOptionButton
                 key={value}
                 size="xs"
-                variant={format === value ? 'secondary' : 'ghost'}
-                aria-pressed={format === value}
+                selected={format === value}
                 onClick={() => setFormat(value)}
               >
                 {labels[value]}
-              </Button>
+              </DubOptionButton>
             ))}
         </div>
         {format === 'mp4' && (
@@ -148,24 +151,25 @@ export function DubExportPanel({ session, disabled }: { session: DubSession; dis
             )}
           </div>
         )}
-        <div className="space-y-2">
-          <p className="text-xs text-muted-foreground">
-            {t(format === 'mp4' ? 'exportModal.default_audio_track' : 'exportModal.languages')}
-          </p>
-          <div className="flex flex-wrap gap-1">
-            {choices.map((code) => (
-              <Button
-                key={code}
-                size="xs"
-                aria-pressed={track === code}
-                variant={track === code ? 'secondary' : 'ghost'}
-                onClick={() => setTrack(code)}
-              >
-                {code === 'original' ? t('exportModal.original') : code.toUpperCase()}
-              </Button>
-            ))}
+        {choices.length > 0 && (
+          <div className="space-y-2">
+            <p className="text-xs text-muted-foreground">
+              {t(format === 'mp4' ? 'exportModal.default_audio_track' : 'exportModal.languages')}
+            </p>
+            <div className="flex flex-wrap gap-1">
+              {choices.map((code) => (
+                <DubOptionButton
+                  key={code}
+                  size="xs"
+                  selected={track === code}
+                  onClick={() => setTrack(code)}
+                >
+                  {code === 'original' ? t('exportModal.original') : code.toUpperCase()}
+                </DubOptionButton>
+              ))}
+            </div>
           </div>
-        </div>
+        )}
         {['mp4', 'wav', 'mp3'].includes(format) &&
           toggle(t('exportModal.bg_audio'), preserveBg, setPreserveBg)}
         {format === 'mp3' && (
@@ -173,15 +177,14 @@ export function DubExportPanel({ session, disabled }: { session: DubSession; dis
             <p className="text-xs text-muted-foreground">{t('exportModal.bitrate')}</p>
             <div className="flex gap-1">
               {['128', '192', '256', '320'].map((value) => (
-                <Button
+                <DubOptionButton
                   key={value}
                   size="xs"
-                  aria-pressed={bitrate === value}
-                  variant={bitrate === value ? 'secondary' : 'ghost'}
+                  selected={bitrate === value}
                   onClick={() => setBitrate(value)}
                 >
                   {value} kbps
-                </Button>
+                </DubOptionButton>
               ))}
             </div>
           </div>
@@ -203,7 +206,13 @@ export function DubExportPanel({ session, disabled }: { session: DubSession; dis
           <p className="text-xs text-muted-foreground">{t('exportModal.stretch_subs_note')}</p>
         )}
         {!ready && (
-          <p className="text-xs text-muted-foreground">{t('exportModal.nothing_selected')}</p>
+          <p role="status" className="text-xs leading-5 text-muted-foreground">
+            {t(
+              session.tracks.length
+                ? 'exportModal.nothing_selected'
+                : 'exportModal.generate_before_export',
+            )}
+          </p>
         )}
         <Button className="w-full" disabled={!ready || locked} onClick={() => void save()}>
           {saving ? <LoaderCircleIcon className="animate-spin" /> : <DownloadIcon />}

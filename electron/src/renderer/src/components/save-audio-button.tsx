@@ -10,10 +10,13 @@ export function SaveAudioButton({
   url,
   suggestedName,
   disabled = false,
+  iconOnly = false,
 }: {
   url?: string;
   suggestedName: string;
   disabled?: boolean;
+  /** Compact icon button for dense lists (e.g. recent takes). */
+  iconOnly?: boolean;
 }) {
   const { t } = useTranslation();
   const [saving, setSaving] = useState(false);
@@ -49,12 +52,14 @@ export function SaveAudioButton({
   return (
     <Button
       variant="ghost"
-      size="sm"
+      size={iconOnly ? 'icon-xs' : 'sm'}
       onClick={() => void save()}
       disabled={disabled || saving || !url || !bridge}
+      aria-label={iconOnly ? t('clone.download') : undefined}
+      title={iconOnly ? t('clone.download') : undefined}
     >
       <DownloadIcon />
-      {t('clone.download')}
+      {!iconOnly && t('clone.download')}
     </Button>
   );
 }
